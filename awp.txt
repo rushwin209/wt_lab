@@ -1,0 +1,841 @@
+=================
+1.Create a real time database in firebase for the student management system and explore the features of Firebase Real Time Database.
+-----index.html
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>real time student database</title>
+    </head>
+    <body>
+        <h2>student regestration form</h2>
+        <form id="studentForm">
+            <label>Name:</label><br>
+            <input type="text" id="name" required><br><br>
+
+            <label>Age:</label><br>
+            <input type="number" id="age" required><br><br>
+
+            <label>course:</label>
+            <input type="text" id="course" required><br><br>
+
+            <button type="submit">Add Student</button>
+        </form>
+        <script type="module" src="app.js"></script>
+    </body>
+</html>
+-----app.js
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import {getDatabase,ref,push,set} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCxiw0jiGFAMRxWVOLTPT8d9DP5Dk28Fws",
+  authDomain: "pratice-session-e476e.firebaseapp.com",
+  databaseURL: "https://pratice-session-e476e-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pratice-session-e476e",
+  storageBucket: "pratice-session-e476e.firebasestorage.app",
+  messagingSenderId: "388179337899",
+  appId: "1:388179337899:web:83d00044451de306140dee",
+  measurementId: "G-4342ZLQB70"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const studentForm=document.getElementById("studentForm");
+
+document.addEventListener("DOMContentLoaded", () => {
+    const studentForm = document.getElementById("studentForm");
+
+    if (studentForm) {
+        studentForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById("name").value;
+            const age = document.getElementById("age").value;
+            const course = document.getElementById("course").value;
+
+            const studentsRef = ref(db, 'students');
+            const newStudentRef = push(studentsRef);
+
+            set(newStudentRef, { name, age, course })
+            .then(() => {
+                alert("Student added successfully to Firebase!");
+                studentForm.reset();
+            })
+            .catch((error) => {
+                alert("Failed to add student: " + error.message);
+            });
+        });
+    }
+});
+===================
+4. Create a REST API and perform various CRUD operations on that.
+import express from 'express';
+
+const app=express();
+app.use(express.json());
+
+let students=[
+    {id:1,name:'rahul',course:'computer science'},
+    {id:2,name:'priya',course:'computer science'}
+]
+
+app.post('/student',(req,res) =>{
+    const newStudent={
+        id:students.length+1,
+        name:req.body.name,
+        course:req.body.course,
+    }
+    students.push(newStudent);
+    res.status(201).json({message:"student data inserted sucess",student:newStudent});
+});
+app.get('/student',(req,res)=>{
+    res.json(students);
+});
+app.put('/student',(req,res)=>{
+    const studentID=parseInt(req.params.id);
+    const student=students.find(s=>s.id===studentID);
+    if(!student){
+        return res.status(404).json({message:"student not found in the database"});
+    }
+    student.name=req.body.name || student.name;
+    student.course=req.body.course || student.course;
+
+    res.json({message:"student data updated sucessfully",student });
+});
+app.delete('/student/:id',(req,res)=>{
+    const studentID=parseInt(req.params.id);
+    const index=students.find(s=>s.id===studentID);
+    if(index===-1){
+        return res.status(404).json({message:"student record not found in the db"});
+    }
+    const deletestudent=students.splice(index,1);
+    res.json({message:"student record deleted successfully ",index:deletestudent});
+});
+app.listen(3000,()=>{
+    console.log("Rest api server is running");
+});
+=====================================
+JWT authentication
+npm init -y
+npm install express jsonwebtoken bcrypt
+
+user.js 
+import bcrypt from 'bcrypt';
+
+const users=[];
+
+export async function createUser(username,password){
+    const existinguser=users.find(u=>u.username===username);
+    if(existinguser){
+        throw new error("user already exists in the data base");
+        
+    }
+    const hashedPassword=await bcrypt.hash(password,10);
+    const newuser={id:users.length+1,username,password:hashedPassword};
+
+    users.push(newuser);
+    return{id:newuser.id,username:newuser.username};
+}
+
+export async function findUserByUsername(username){
+    return users.find(u=>u.username===username);
+}
+jwt.js
+import jwt from 'jsonwebtoken';
+
+const SECERET_KEY="my_spuer_secret_key";
+
+export function generatorToken(user){
+    return jwt.sign(
+        {id:user.id,username:user.username},
+        SECERET_KEY,
+        {expiresIn:'1h'}
+    );
+}
+export function authenticateToken(req,res,next){
+    const authHeader=req.headers['authorization'];
+    const token=authHeader && authHeader.split('')[1];
+
+    if(!token){
+        return res.status(401).json({message:'access token mesing or unauthoried '});
+    }
+
+    jwt.verify(token,SECERET_KEY,(err,user)=>{
+        if(err){
+            return res.status(401).json({message:'token expired or invalid '});
+        }
+        req.user=user;
+        next();
+    });
+}
+auth.js
+import express from 'express';
+import bcrypt from 'bcrypt';
+import { createUser,findUserByUsername } from './user.js';
+import { generatorToken,authenticateToken } from './jwt.js';
+
+const app=express();
+app.use(express.json());
+
+app.post('/signup',async(req,res)=>{
+    try{
+        const {username,password}=req.body;
+        if(!username || !password){
+            return res.status(401).json({message:'username and password are required' });
+        }
+        const user=await createUser(username,password);
+        res.status(201).json({message:"usercreated sucessfully",user});
+    }catch(error){
+        res.status(401).json({message:error.message});
+    }
+});
+app.post('/login',async (req,res)=>{
+    try{
+        const {username,password}=req.body;
+        const user=await findUserByUsername(username);
+
+        if(!user){
+            return res.status(400).json({message:'invalide username could not find in the db'});
+        }
+
+        const isPasswordValid=await bcrypt.compare(password,user.password);
+        if(!isPasswordValid){
+            return res.status(401).json({message:'wrong password or wrong username entered'});
+        }
+
+        const token=generatorToken(user);
+        res.json({message:'login sucessfull',token});
+    }catch(error){
+        res.status(500).json({message:error.message});
+    }
+});
+app.get('/profile',authenticateToken,(req,res)=>{
+    res.json({
+        message:'access granted to protected route',
+        user:req.user
+    });
+});
+const PORT=3000;
+app.listen(PORT,()=>{
+    console.log('authe server is running');
+});
+===============================================
+react helloworld:
+npm create vite@latest
+cd my-react-app
+npm install
+npm run dev
+
+import React from "react";
+
+function App(){
+  return(
+    <div style={{textAlign:"center",marginTop:"50px"}}>
+      <h1>helloworld</h1>
+      <p>welcome to my react aplication</p>
+    </div>
+  );
+}
+
+export default App;
+================================================
+current date and time 
+
+import React, { useState, useEffect } from 'react';
+
+function App() {
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div style={{ textAlign: "center", marginTop: "50px", fontFamily: "Arial, sans-serif" }}>
+      <h1>Current System Date and Time</h1>
+      <p style={{ fontSize: "24px", fontWeight: "bold", color: "#2c3e50" }}>
+        {currentDateTime.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+export default App;
+============================================
+9.a. Create a functional component that accept the arbitrary inputs (called props) and display the value.
+b. Create a class component that accept the arbitrary inputs (called props) and display the value.
+(Introduction to Components in React, Types of Components in react, Functional vs Class Component, Passing the props to child Components).
+seperate app.jsx programs for a and b questions
+a.import React from 'react';
+
+// Child Functional Component accepting props
+function StudentCard(props) {
+  return (
+    <div style={{ border: '1px solid #3498db', padding: '15px', margin: '10px auto', width: '300px', borderRadius: '5px', backgroundColor: '#f9f9f9' }}>
+      <h3>Name: {props.name}</h3>
+      <p>Course: {props.course}</p>
+      <p>University: {props.university}</p>
+    </div>
+  );
+}
+
+// Parent App Component
+function App() {
+  return (
+    <div style={{ textAlign: 'center', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <h2>Functional Component Example</h2>
+      <StudentCard name="Rahul Sharma" course="Computer Science" university="Delhi University" />
+      <StudentCard name="Priya Patel" course="Information Technology" university="Mumbai University" />
+    </div>
+  );
+}
+
+export default App;
+
+b.import React, { Component } from 'react';
+
+// Child Class Component accepting props
+class StudentClassCard extends Component {
+  render() {
+    // Accessing props via `this.props`
+    const { name, course, university } = this.props;
+    
+    return (
+      <div style={{ border: '1px solid #e74c3c', padding: '15px', margin: '10px auto', width: '300px', borderRadius: '5px', backgroundColor: '#fef9f9' }}>
+        <h3>Name: {name}</h3>
+        <p>Course: {course}</p>
+        <p>University: {university}</p>
+      </div>
+    );
+  }
+}
+
+// Parent App Component (Class-based)
+class App extends Component {
+  render() {
+    return (
+      <div style={{ textAlign: 'center', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+        <h2>Class Component Example</h2>
+        <StudentClassCard name="Amit Kumar" course="Electronics" university="Anna University" />
+        <StudentClassCard name="Neha Singh" course="Mechanical Engineering" university="IIT Bombay" />
+      </div>
+    );
+  }
+}
+
+export default App;
+====================================
+10.Create a class component that accept the date in the form of State and displays the date. (Passing the state to Class Component, Props vs State).
+
+import React, { Component } from 'react';
+
+class App extends Component {
+  // 1. Initialize state inside the constructor
+  constructor(props) {
+    super(props);
+    this.state = {
+      currentDate: new Date()
+    };
+  }
+
+  // 2. Lifecycle method: Runs once the component is mounted to the DOM
+  componentDidMount() {
+    this.timerID = setInterval(() => {
+      // Update state using this.setState() to trigger a re-render
+      this.setState({ currentDate: new Date() });
+    }, 1000);
+  }
+
+  // 3. Lifecycle method: Cleans up the timer when the component is destroyed
+  componentWillUnmount() {
+    clearInterval(this.timerID);
+  }
+
+  render() {
+    return (
+      <div style={{ textAlign: "center", marginTop: "50px", fontFamily: "Arial, sans-serif" }}>
+        <h2>Live System Date and Time (Class Component State)</h2>
+        <p style={{ fontSize: "26px", fontWeight: "bold", color: "#2980b9" }}>
+          {this.state.currentDate.toLocaleString()}
+        </p>
+      </div>
+    );
+  }
+}
+
+export default App;
+==================================================
+11.Create a react program similar aboveto demonstrate the component lifecycle.
+and you are using too much styling just use default styling for most of the case
+
+import React, { Component } from 'react';
+
+// Child Component demonstrating lifecycle methods
+class LifecycleDemo extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { count: 0 };
+    console.log("1. Constructor: Component is being initialized");
+  }
+
+  componentDidMount() {
+    console.log("3. componentDidMount: Component has rendered to the DOM");
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    console.log("5. componentDidUpdate: Component updated. Old count:", prevState.count, "New count:", this.state.count);
+  }
+
+  componentWillUnmount() {
+    console.log("6. componentWillUnmount: Component is removed from the DOM");
+  }
+
+  increment = () => {
+    this.setState({ count: this.state.count + 1 });
+  };
+
+  render() {
+    console.log("2 / 4. Render: Rendering JSX to virtual DOM");
+    return (
+      <div>
+        <h3>Child Lifecycle Component</h3>
+        <p>Current Count: {this.state.count}</p>
+        <button onClick={this.increment}>Increment Count</button>
+      </div>
+    );
+  }
+}
+
+// Parent App Component
+class App extends Component {
+  state = { showComponent: true };
+
+  toggleComponent = () => {
+    this.setState({ showComponent: !this.state.showComponent });
+  };
+
+  render() {
+    return (
+      <div>
+        <h2>React Component Lifecycle Example</h2>
+        <button onClick={this.toggleComponent}>
+          {this.state.showComponent ? "Unmount Component" : "Mount Component"}
+        </button>
+        <hr />
+        
+        {this.state.showComponent && <LifecycleDemo />}
+        
+        <p style={{ marginTop: "20px", color: "gray" }}>
+          *Open your browser Developer Tools Console (F12) to see the execution order logs!
+        </p>
+      </div>
+    );
+  }
+}
+
+export default App;
+============================================
+12.Create a react program similar aboveto demonstrate the component lifecycle.
+
+import React, { Component } from 'react';
+
+// Child Component demonstrating lifecycle methods
+class LifecycleDemo extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { count: 0 };
+    console.log("1. Constructor: Component is being initialized");
+  }
+
+  componentDidMount() {
+    console.log("3. componentDidMount: Component has rendered to the DOM");
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    console.log("5. componentDidUpdate: Component updated. Old count:", prevState.count, "New count:", this.state.count);
+  }
+
+  componentWillUnmount() {
+    console.log("6. componentWillUnmount: Component is removed from the DOM");
+  }
+
+  increment = () => {
+    this.setState({ count: this.state.count + 1 });
+  };
+
+  render() {
+    console.log("2 / 4. Render: Rendering JSX to virtual DOM");
+    return (
+      <div>
+        <h3>Child Lifecycle Component</h3>
+        <p>Current Count: {this.state.count}</p>
+        <button onClick={this.increment}>Increment Count</button>
+      </div>
+    );
+  }
+}
+
+// Parent App Component
+class App extends Component {
+  state = { showComponent: true };
+
+  toggleComponent = () => {
+    this.setState({ showComponent: !this.state.showComponent });
+  };
+
+  render() {
+    return (
+      <div>
+        <h2>React Component Lifecycle Example</h2>
+        <button onClick={this.toggleComponent}>
+          {this.state.showComponent ? "Unmount Component" : "Mount Component"}
+        </button>
+        <hr />
+        
+        {this.state.showComponent && <LifecycleDemo />}
+        
+        <p style={{ marginTop: "20px", color: "gray" }}>
+          *Open your browser Developer Tools Console (F12) to see the execution order logs!
+        </p>
+      </div>
+    );
+  }
+}
+
+export default App;
+===========================================
+Create a react application to create a two buttons and handle the click events. The click event of first display the current system date and time using event listener (Normal functions). For click event of second button display "Good Bye" by using event listener (arrow functions)
+(Handling the events in React, Binding event listeners)
+import React, { Component } from 'react';
+
+class App extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      displayMessage: ""
+    };
+
+    // Explicitly binding the normal function to 'this'
+    this.handleDateTimeClick = this.handleDateTimeClick.bind(this);
+  }
+
+  // 1. Normal function for Button 1 (requires binding in class components)
+  handleDateTimeClick() {
+    const currentDateTime = new Date().toLocaleString();
+    this.setState({ displayMessage: `Current Date & Time: ${currentDateTime}` });
+  }
+
+  // 2. Arrow function for Button 2 (automatically binds 'this')
+  handleGoodbyeClick = () => {
+    this.setState({ displayMessage: "Good Bye!" });
+  };
+
+  render() {
+    return (
+      <div>
+        <h2>Event Handling and Binding in React</h2>
+        
+        {/* Button 1 using a normal function with binding */}
+        <button onClick={this.handleDateTimeClick}>
+          Show Date and Time
+        </button>
+        
+        {/* Button 2 using an arrow function */}
+        <button onClick={this.handleGoodbyeClick}>
+          Say Good Bye
+        </button>
+
+        <p>{this.state.displayMessage}</p>
+      </div>
+    );
+  }
+}
+
+export default App;
+===============================================================
+Create a react application to implement the calculator application by creating UI and providing the functionality using events. Also make it look good by using styles.
+(React Styling: How to use the Styles in React)
+import React, { useState } from 'react';
+
+function App() {
+  const [input, setInput] = useState('');
+
+  // Append values to input string
+  const handleClick = (value) => {
+    setInput((prev) => prev + value);
+  };
+
+  // Clear display
+  const handleClear = () => {
+    setInput('');
+  };
+
+  // Evaluate the expression using eval()
+  const handleCalculate = () => {
+    try {
+      // eval() computes the string mathematical expression safely here
+      const result = eval(input);
+      setInput(String(result));
+    } catch (error) {
+      setInput('Error');
+    }
+  };
+
+  // React Inline Styling Objects
+  const styles = {
+    container: {
+      width: '260px',
+      margin: '40px auto',
+      padding: '20px',
+      border: '1px solid #ccc',
+      borderRadius: '5px',
+      fontFamily: 'Arial, sans-serif',
+      backgroundColor: '#f9f9f9'
+    },
+    display: {
+      width: '100%',
+      height: '40px',
+      marginBottom: '15px',
+      fontSize: '18px',
+      textAlign: 'right',
+      padding: '5px',
+      boxSizing: 'border-box'
+    },
+    buttonGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: '8px'
+    },
+    button: {
+      padding: '12px',
+      fontSize: '16px',
+      cursor: 'pointer'
+    },
+    clearButton: {
+      padding: '12px',
+      fontSize: '16px',
+      cursor: 'pointer',
+      gridColumn: 'span 4',
+      backgroundColor: '#f2dede',
+      border: '1px solid #ebccd1'
+    }
+  };
+
+  const buttons = ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', '+'];
+
+  return (
+    <div style={styles.container}>
+      <h2>Calculator</h2>
+      
+      {/* Display screen */}
+      <input type="text" value={input} readOnly style={styles.display} />
+
+      {/* Button Grid */}
+      <div style={styles.buttonGrid}>
+        {buttons.map((btn, index) => (
+          <button key={index} onClick={() => handleClick(btn)} style={styles.button}>
+            {btn}
+          </button>
+        ))}
+        
+        {/* Equals Button */}
+        <button onClick={handleCalculate} style={{ ...styles.button, backgroundColor: '#dff0d8' }}>
+          =
+        </button>
+
+        {/* Clear Button */}
+        <button onClick={handleClear} style={styles.clearButton}>
+          Clear
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default App;
+=======================================================
+Create a react application to create a registration page using forms as controlled components.
+(Working with the React Forms)
+import React, { useState } from 'react';
+
+function App() {
+  // 1. Initialize state for all form fields
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    course: 'Computer Science'
+  });
+
+  const [submittedData, setSubmittedData] = useState(null);
+
+  // 2. Handle change for inputs and select elements
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  // 3. Handle form submission
+  const handleSubmit = (e) => {
+    e.preventDefault(); // Prevents page reload on submit
+    setSubmittedData(formData);
+  };
+
+  return (
+    <div style={{ margin: '30px', fontFamily: 'Arial, sans-serif' }}>
+      <h2>Student Registration Form</h2>
+      
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '10px' }}>
+          <label>Username: </label><br />
+          <input
+            type="text"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div style={{ marginBottom: '10px' }}>
+          <label>Email: </label><br />
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div style={{ marginBottom: '10px' }}>
+          <label>Password: </label><br />
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label>Course: </label><br />
+          <select name="course" value={formData.course} onChange={handleChange}>
+            <option value="Computer Science">Computer Science</option>
+            <option value="Information Technology">Information Technology</option>
+            <option value="Electronics">Electronics</option>
+          </select>
+        </div>
+
+        <button type="submit">Register</button>
+      </form>
+
+      {/* Display submitted data summary */}
+      {submittedData && (
+        <div style={{ marginTop: '20px', padding: '15px', border: '1px solid #ccc', backgroundColor: '#f9f9f9' }}>
+          <h3>Registration Successful!</h3>
+          <p><strong>Username:</strong> {submittedData.username}</p>
+          <p><strong>Email:</strong> {submittedData.email}</p>
+          <p><strong>Course:</strong> {submittedData.course}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
+==========================================================
+Create a react application to understand how the React Router works. The application will contain four components: home component, product component, about component, and contact component. We will use React Router to navigate between these components. (React Routing, React Router components)
+npm install react-router-dom
+import React from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+
+// 1. Home Component
+function Home() {
+  return (
+    <div>
+      <h3>Home Page</h3>
+      <p>Welcome to our application! This is the default home view.</p>
+    </div>
+  );
+}
+
+// 2. Product Component
+function Product() {
+  return (
+    <div>
+      <h3>Product Page</h3>
+      <p>Here you can explore our available products and services.</p>
+    </div>
+  );
+}
+
+// 3. About Component
+function About() {
+  return (
+    <div>
+      <h3>About Us</h3>
+      <p>We are learning how Single Page Applications (SPAs) use client-side routing.</p>
+    </div>
+  );
+}
+
+// 4. Contact Component
+function Contact() {
+  return (
+    <div>
+      <h3>Contact Us</h3>
+      <p>Reach out to us via email at support@example.com.</p>
+    </div>
+  );
+}
+
+// Main App Component with Router Configuration
+function App() {
+  return (
+    <BrowserRouter>
+      <div style={{ margin: '20px', fontFamily: 'Arial, sans-serif' }}>
+        <h2>React Router Navigation Example</h2>
+        
+        {/* Navigation Links (Replaces traditional anchor tags <a> to prevent full page reloads) */}
+        <nav style={{ display: 'flex', gap: '15px', margin: '15px 0' }}>
+          <Link to="/">Home</Link>
+          <Link to="/product">Product</Link>
+          <Link to="/about">About</Link>
+          <Link to="/contact">Contact</Link>
+        </nav>
+
+        <hr />
+
+        {/* Route Definitions: Renders the matching component based on the URL path */}
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/product" element={<Product />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+======================================================
+
+
+
+
+
+
+
