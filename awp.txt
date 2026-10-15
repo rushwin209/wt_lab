@@ -832,8 +832,129 @@ function App() {
 
 export default App;
 ======================================================
+Develop an express web application that can interact with a service to perform CRUD operations on student data. (Use Postman or already avaliable thunder client)
 
+student-api/
+│
+├── node_modules/
+├── routes/
+│   └── studentRoutes.js
+├── package.json
+└── server.js
+package.json
+{
+  "name": "student-api",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
+cmd:npm install
+routes/studentRoutes.js
+import express from 'express';
 
+const router = express.Router();
+
+// Mock database (in-memory storage for students)
+let students = [
+    { id: 1, name: "Rahul Sharma", course: "Computer Science" },
+    { id: 2, name: "Priya Patel", course: "Information Technology" }
+];
+
+// 1. READ (GET): Get all students
+router.get('/', (req, res) => {
+    res.json({ success: true, count: students.length, data: students });
+});
+
+// 2. READ (GET): Get a single student by ID
+router.get('/:id', (req, res) => {
+    const studentId = parseInt(req.params.id);
+    const student = students.find(s => s.id === studentId);
+
+    if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+    }
+    res.json({ success: true, data: student });
+});
+
+// 3. CREATE (POST): Add a new student
+router.post('/', (req, res) => {
+    const { name, course } = req.body;
+
+    if (!name || !course) {
+        return res.status(400).json({ success: false, message: "Please provide both name and course" });
+    }
+
+    const newStudent = {
+        id: students.length > 0 ? students[students.length - 1].id + 1 : 1,
+        name,
+        course
+    };
+
+    students.push(newStudent);
+    res.status(201).json({ success: true, message: "Student created successfully", data: newStudent });
+});
+
+// 4. UPDATE (PUT): Update an existing student by ID
+router.put('/:id', (req, res) => {
+    const studentId = parseInt(req.params.id);
+    const student = students.find(s => s.id === studentId);
+
+    if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    student.name = req.body.name || student.name;
+    student.course = req.body.course || student.course;
+
+    res.json({ success: true, message: "Student updated successfully", data: student });
+});
+
+// 5. DELETE (DELETE): Remove a student by ID
+router.delete('/:id', (req, res) => {
+    const studentId = parseInt(req.params.id);
+    const index = students.findIndex(s => s.id === studentId);
+
+    if (index === -1) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    const deletedStudent = students.splice(index, 1);
+    res.json({ success: true, message: "Student deleted successfully", data: deletedStudent[0] });
+});
+
+export default router;
+
+server.js
+import express from 'express';
+import studentRoutes from './routes/studentRoutes.js';
+
+const app = express();
+const PORT = 3000;
+
+// Middleware to parse incoming JSON payloads
+app.use(express.json());
+
+// Logger middleware to track incoming requests in your terminal
+app.use((req, res, next) => {
+    console.log(`[${new Date().toLocaleTimeString()}] ${req.method} request to ${req.url}`);
+    next();
+});
+
+// Mount student routes
+app.use('/api/students', studentRoutes);
+
+// Base route handler
+app.get('/', (req, res) => {
+    res.send('Welcome to the Student Management REST API! Use /api/students endpoints.');
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running live at http://localhost:${PORT}`);
+});
 
 
 
